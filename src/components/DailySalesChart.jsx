@@ -57,7 +57,9 @@ export default function DailySalesChart({ data }) {
   return (
     <div className="rounded-xl border border-[#e3d5bf] bg-[#fdfbf6] p-4 shadow-sm sm:p-5">
       <h2 className="text-sm font-semibold text-[#3b2a1a]">ยอดขายรายวัน</h2>
-      <div className="mt-2 h-64 w-full sm:h-80">
+      {/* กราฟนี้ขึ้นเต็มความกว้างหน้าจอ (ดู App.jsx) เลยเพิ่มความสูงจาก h-64/h-80 เดิม
+          ให้สัดส่วนพอดีกับความกว้างที่มากขึ้น อ่านแนวโน้มและจุดพีคได้ง่ายขึ้น */}
+      <div className="mt-2 h-72 w-full sm:h-96">
         <ResponsiveContainer width="100%" height="100%">
           <LineChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
             <CartesianGrid vertical={false} stroke="#e6dcc8" strokeDasharray="0" />

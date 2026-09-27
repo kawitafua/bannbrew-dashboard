@@ -137,12 +137,17 @@ function App() {
               <KpiCards metrics={metrics} />
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-2">
+            {/* กราฟยอดขายรายวันเป็นกราฟที่ "ยาว" ที่สุด (แกน X มีจุดข้อมูลนับร้อยจุดตามช่วงวันที่
+                ที่กรอง) เลยให้ขึ้นเต็มความกว้างหน้าจอเป็นแถวของตัวเอง อ่านง่ายกว่าถูกบีบให้เหลือ
+                ครึ่งจอ ส่วนกราฟอีก 2 อัน (แยกสาขา, ตามชั่วโมง) มีจำนวนหมวดหมู่คงที่และน้อยกว่ามาก
+                (5 สาขา, 24 ชั่วโมง) จึงอ่านง่ายอยู่แล้วแม้อยู่ในคอลัมน์ครึ่งจอ เลยจับมาไว้แถวล่าง
+                ด้วยกัน */}
+            <div className="mt-4 sm:mt-6">
               <DailySalesChart data={metrics.dailySales} />
-              <BranchSalesChart data={metrics.salesByBranch} />
             </div>
 
-            <div className="mt-4 sm:mt-6">
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-2">
+              <BranchSalesChart data={metrics.salesByBranch} />
               <HourlyOrdersChart data={metrics.ordersByHour} />
             </div>
           </>
