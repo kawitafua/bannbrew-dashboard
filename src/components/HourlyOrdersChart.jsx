@@ -1,4 +1,3 @@
-import { useMemo, useState } from 'react'
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts'
 import { formatNumber } from '../lib/format'
 import ChartTooltip from './ChartTooltip'
@@ -24,36 +23,15 @@ function formatHourLabel(hour) {
 }
 
 /**
- * กราฟแท่งจำนวนบิลแยกตามชั่วโมงของวัน (0-23) พร้อม dropdown เลือกดูทีละสาขา
- * รับ ordersByHour = metrics.ordersByHour จาก getOrderCountByHourGrouped()
- * รูปแบบ { all: [{hour, count}, ...24], byBranch: { [branch]: [{hour, count}, ...24] } }
- * และ branches = metrics.branches (รายชื่อสาขาเรียงยอดขายมาก -> น้อย สำหรับเติม dropdown)
+ * กราฟแท่งจำนวนบิลแยกตามชั่วโมงของวัน (0-23)
+ * รับ data = metrics.ordersByHour จาก computeMetrics() รูปแบบ [{hour, count}, ...24]
+ * ข้อมูลนี้คำนวณจากแถวที่ผ่านตัวกรองสาขา/ช่วงวันที่ส่วนกลาง (FilterBar) มาแล้ว
+ * จึงไม่ต้องมี dropdown เลือกสาขาซ้ำในการ์ดนี้อีก — ใช้ตัวกรองที่ด้านบนของแดชบอร์ดแทน
  */
-export default function HourlyOrdersChart({ ordersByHour, branches }) {
-  const [selectedBranch, setSelectedBranch] = useState('all')
-
-  const data = useMemo(() => {
-    if (selectedBranch === 'all') return ordersByHour.all
-    return ordersByHour.byBranch[selectedBranch] ?? ordersByHour.all
-  }, [ordersByHour, selectedBranch])
-
+export default function HourlyOrdersChart({ data }) {
   return (
     <div className="rounded-xl border border-[#e3d5bf] bg-[#fdfbf6] p-4 shadow-sm sm:p-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="text-sm font-semibold text-[#3b2a1a]">จำนวนบิลตามชั่วโมงของวัน</h2>
-        <select
-          value={selectedBranch}
-          onChange={(event) => setSelectedBranch(event.target.value)}
-          className="rounded-lg border border-[#d8c6a3] bg-[#fdfbf6] px-2.5 py-1.5 text-xs font-medium text-[#5c4a34] focus:outline-none focus:ring-2 focus:ring-[#A9642F]/40 sm:text-sm"
-        >
-          <option value="all">ทุกสาขา</option>
-          {branches.map((branch) => (
-            <option key={branch} value={branch}>
-              {branch}
-            </option>
-          ))}
-        </select>
-      </div>
+      <h2 className="text-sm font-semibold text-[#3b2a1a]">จำนวนบิลตามชั่วโมงของวัน</h2>
       <div className="mt-2 h-64 w-full sm:h-80">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>

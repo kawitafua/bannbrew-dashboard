@@ -208,44 +208,78 @@ export function getOrderCountByHour(rows) {
 }
 
 /**
- * จำนวนบิลแยกตามชั่วโมง ทั้งภาพรวม (all) และแยกทีละสาขา (byBranch)
- * คำนวณครั้งเดียวตอนโหลดข้อมูล เพื่อให้ตัวเลือกสาขาในกราฟสลับไปมาได้ทันที
- * โดยไม่ต้องคำนวณใหม่ทุกครั้งที่ผู้ใช้เปลี่ยนตัวกรอง
+ * รายชื่อสาขาทั้งหมด เรียงจากยอดขายมาก -> น้อย
+ * ใช้เติม dropdown ตัวเลือกสาขาในแถบตัวกรอง — ตั้งใจให้รับ "ข้อมูลทั้งหมดที่ยังไม่ได้กรอง"
+ * เสมอ (allRows ไม่ใช่ filteredRows) ไม่งั้นพอเลือกกรองสาขา/ช่วงวันที่แล้ว ตัวเลือกในสาขา
+ * dropdown จะหายไปเรื่อย ๆ ตามข้อมูลที่เหลือ
  */
-export function getOrderCountByHourGrouped(rows) {
-  const branches = Array.from(new Set(rows.map((row) => row.branch)))
-  const byBranch = {}
-
-  for (const branch of branches) {
-    byBranch[branch] = getOrderCountByHour(rows.filter((row) => row.branch === branch))
-  }
-
-  return {
-    all: getOrderCountByHour(rows),
-    byBranch,
-  }
+export function getBranchOptions(rows) {
+  return getSalesByBranch(rows).map((b) => b.branch)
 }
 
 /**
- * ฟังก์ชันหลัก: รับแถวดิบจาก PapaParse มาครั้งเดียว แล้วคำนวณทุกอย่างที่แดชบอร์ดต้องใช้
- * เรียกใช้ครั้งเดียวตอนโหลดไฟล์ แล้วส่งผลลัพธ์นี้เข้า component ต่าง ๆ
+ * หาวันแรกสุด/วันล่าสุดที่มีข้อมูลอยู่ในชุดข้อมูล (YYYY-MM-DD)
+ * ใช้กำหนดขอบเขต min/max ของ date picker และค่าตั้งต้นตอนกด "ล้างตัวกรอง"
+ * เหมือน getBranchOptions ควรรับ allRows (ข้อมูลทั้งหมด) ไม่ใช่ filteredRows
  */
-export function computeDashboardMetrics(rawRows) {
-  const rows = normalizeRows(rawRows)
-  const salesByBranch = getSalesByBranch(rows)
+export function getDateBounds(rows) {
+  let minDate = null
+  let maxDate = null
 
+  for (const row of rows) {
+    if (!row.dateKey) continue
+    if (minDate === null || row.dateKey < minDate) minDate = row.dateKey
+    if (maxDate === null || row.dateKey > maxDate) maxDate = row.dateKey
+  }
+
+  return { minDate, maxDate }
+}
+
+/**
+ * กรองแถวข้อมูลตามตัวกรองที่ผู้ใช้เลือก: สาขา และ/หรือ ช่วงวันที่ (ทั้งคู่เลือกได้อิสระ)
+ *  - branch: 'all' หรือค่าว่าง = ไม่กรองสาขา, ไม่งั้นต้องตรงกับ row.branch เป๊ะ
+ *  - startDate / endDate: ค่าว่าง = ไม่จำกัดด้านนั้น, ไม่งั้นเทียบแบบ YYYY-MM-DD (เทียบ string
+ *    ตรง ๆ ได้เลยเพราะ dateKey อยู่ในรูปแบบนี้อยู่แล้ว เรียงตามเวลาจริงพอดี)
+ */
+export function filterRows(rows, { branch, startDate, endDate } = {}) {
+  return rows.filter((row) => {
+    if (branch && branch !== 'all' && row.branch !== branch) return false
+    if (startDate && row.dateKey < startDate) return false
+    if (endDate && row.dateKey > endDate) return false
+    return true
+  })
+}
+
+/**
+ * คำนวณตัวเลขทุกอย่างที่แดชบอร์ดต้องใช้ จากแถวข้อมูลที่ผ่าน normalizeRows() แล้ว
+ * (และอาจถูกกรองด้วย filterRows() มาก่อนแล้วก็ได้ — ฟังก์ชันนี้ไม่สนใจว่ากรองมาหรือยัง
+ * แค่คำนวณจากแถวที่ได้รับเข้ามาตรง ๆ) เรียกใหม่ทุกครั้งที่ตัวกรองเปลี่ยน
+ */
+export function computeMetrics(rows) {
   return {
-    // rowCount ไว้ให้ UI เช็คว่า parse ได้ข้อมูลจริงหรือไม่ (0 = อ่านคอลัมน์ไม่ตรง/ไฟล์ผิดที่)
-    rawRowCount: rawRows.length,
     rowCount: rows.length,
     totalSales: getTotalSales(rows),
     orderCount: getOrderCount(rows),
     averageOrderValue: getAverageOrderValue(rows),
     memberCount: getUniqueMemberCount(rows),
     dailySales: getDailySalesWithMovingAverage(rows, 7),
-    salesByBranch,
-    // รายชื่อสาขาเรียงจากยอดขายมาก -> น้อย (ใช้เติม dropdown ตัวเลือกสาขาให้เรียงลำดับเดียวกันทั้งแดชบอร์ด)
-    branches: salesByBranch.map((b) => b.branch),
-    ordersByHour: getOrderCountByHourGrouped(rows),
+    salesByBranch: getSalesByBranch(rows),
+    ordersByHour: getOrderCountByHour(rows),
+  }
+}
+
+/**
+ * ฟังก์ชันหลัก (ทางลัด): รับแถวดิบจาก PapaParse มาครั้งเดียว แล้ว normalize + คำนวณทุกอย่าง
+ * ในขั้นตอนเดียว เหมาะกับกรณีที่ไม่ต้องมีตัวกรอง — ถ้าต้องรองรับตัวกรอง (เลือกสาขา/ช่วงวันที่)
+ * ให้เรียก normalizeRows() เก็บไว้ครั้งเดียว แล้วเรียก filterRows() + computeMetrics() แยก
+ * ทุกครั้งที่ตัวกรองเปลี่ยนแทน (ดู App.jsx)
+ */
+export function computeDashboardMetrics(rawRows) {
+  const rows = normalizeRows(rawRows)
+
+  return {
+    // rawRowCount ไว้ให้ UI เช็คว่า parse ได้ข้อมูลจริงหรือไม่ (0 = อ่านคอลัมน์ไม่ตรง/ไฟล์ผิดที่)
+    rawRowCount: rawRows.length,
+    ...computeMetrics(rows),
   }
 }

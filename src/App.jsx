@@ -1,14 +1,26 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import Papa from 'papaparse'
-import { computeDashboardMetrics } from './lib/metrics'
+import {
+  normalizeRows,
+  computeMetrics,
+  getBranchOptions,
+  getDateBounds,
+  filterRows,
+} from './lib/metrics'
+import FilterBar from './components/FilterBar'
 import KpiCards from './components/KpiCards'
 import DailySalesChart from './components/DailySalesChart'
 import BranchSalesChart from './components/BranchSalesChart'
 import HourlyOrdersChart from './components/HourlyOrdersChart'
 
+const EMPTY_FILTERS = { branch: 'all', startDate: '', endDate: '' }
+
 function App() {
-  const [metrics, setMetrics] = useState(null)
+  // allRows = ข้อมูลทั้งชุดหลัง normalize (ยังไม่กรอง) — คำนวณครั้งเดียวตอนโหลดไฟล์เสร็จ
+  const [allRows, setAllRows] = useState(null)
+  const [rawRowCount, setRawRowCount] = useState(0)
   const [error, setError] = useState(null)
+  const [filters, setFilters] = useState(EMPTY_FILTERS)
 
   useEffect(() => {
     // ไฟล์อยู่ใน public/ จึง fetch ได้ตรง ๆ ที่ path "/sales.csv"
@@ -24,13 +36,33 @@ function App() {
         if (result.errors?.length) {
           console.warn('PapaParse warnings:', result.errors)
         }
-        setMetrics(computeDashboardMetrics(result.data))
+        setRawRowCount(result.data.length)
+        setAllRows(normalizeRows(result.data))
       },
       error: (err) => {
         setError(err.message)
       },
     })
   }, [])
+
+  // ตัวเลือกสาขา + ขอบเขตวันที่ ต้องมาจากข้อมูล "ทั้งชุด" เสมอ ไม่ใช่ข้อมูลที่กรองแล้ว
+  // ไม่งั้นพอเลือกกรองไปแล้ว ตัวเลือกในแถบตัวกรองจะหายไปเรื่อย ๆ ตามข้อมูลที่เหลือ
+  const branchOptions = useMemo(() => (allRows ? getBranchOptions(allRows) : []), [allRows])
+  const dateBounds = useMemo(
+    () => (allRows ? getDateBounds(allRows) : { minDate: null, maxDate: null }),
+    [allRows],
+  )
+
+  const filteredRows = useMemo(
+    () => (allRows ? filterRows(allRows, filters) : []),
+    [allRows, filters],
+  )
+  const metrics = useMemo(() => computeMetrics(filteredRows), [filteredRows])
+
+  const hasActiveFilters =
+    filters.branch !== 'all' || filters.startDate !== '' || filters.endDate !== ''
+
+  const handleClearFilters = () => setFilters(EMPTY_FILTERS)
 
   if (error) {
     return (
@@ -40,7 +72,7 @@ function App() {
     )
   }
 
-  if (!metrics) {
+  if (!allRows) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f5f0e6]">
         <p className="text-[#8a7256]">กำลังโหลดข้อมูล...</p>
@@ -49,13 +81,15 @@ function App() {
   }
 
   // parse ผ่าน แต่ไม่มีแถวไหนมี order_id เลย = เกือบจะแน่นอนว่าชื่อคอลัมน์หรือ path ไฟล์ไม่ตรง
-  if (metrics.rowCount === 0) {
+  // เช็คจาก allRows (ข้อมูลทั้งชุดก่อนกรอง) เท่านั้น ไม่ใช้ metrics.rowCount ของข้อมูลที่กรองแล้ว
+  // เพราะ metrics.rowCount === 0 ก็เกิดได้ปกติเวลาผู้ใช้เลือกช่วงวันที่ที่ไม่มีข้อมูล
+  if (allRows.length === 0) {
     return (
       <div className="flex min-h-screen items-center justify-center bg-[#f5f0e6] p-4">
         <div className="max-w-md rounded-xl border border-[#d8bd84] bg-[#f4e8cf] p-6">
           <h1 className="text-lg font-semibold text-[#4a3a1a]">ไม่พบข้อมูลที่อ่านได้จาก sales.csv</h1>
           <p className="mt-2 text-sm text-[#5c4a26]">
-            อ่านไฟล์เจอ {metrics.rawRowCount} แถว แต่ไม่มีแถวไหนมีค่า{' '}
+            อ่านไฟล์เจอ {rawRowCount} แถว แต่ไม่มีแถวไหนมีค่า{' '}
             <code className="rounded bg-[#e9d9b0] px-1">order_id</code> เลย สาเหตุที่พบบ่อยที่สุด:
           </p>
           <ul className="mt-2 list-disc space-y-1 pl-5 text-sm text-[#5c4a26]">
@@ -75,17 +109,44 @@ function App() {
         <p className="mt-1 text-sm text-[#8a7256]">สรุปยอดขายจาก sales.csv</p>
 
         <div className="mt-4 sm:mt-6">
-          <KpiCards metrics={metrics} />
+          <FilterBar
+            branches={branchOptions}
+            branch={filters.branch}
+            onBranchChange={(branch) => setFilters((prev) => ({ ...prev, branch }))}
+            startDate={filters.startDate}
+            endDate={filters.endDate}
+            onStartDateChange={(startDate) => setFilters((prev) => ({ ...prev, startDate }))}
+            onEndDateChange={(endDate) => setFilters((prev) => ({ ...prev, endDate }))}
+            minDate={dateBounds.minDate}
+            maxDate={dateBounds.maxDate}
+            onClear={handleClearFilters}
+            hasActiveFilters={hasActiveFilters}
+          />
         </div>
 
-        <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-2">
-          <DailySalesChart data={metrics.dailySales} />
-          <BranchSalesChart data={metrics.salesByBranch} />
-        </div>
+        {filteredRows.length === 0 ? (
+          <div className="mt-4 rounded-xl border border-[#d8bd84] bg-[#f4e8cf] p-6 sm:mt-6">
+            <p className="text-sm font-medium text-[#4a3a1a]">
+              ไม่มีข้อมูลตรงกับตัวกรองที่เลือกไว้ (สาขา/ช่วงวันที่) ลองปรับตัวกรอง หรือกด
+              "ล้างตัวกรอง" ด้านบน
+            </p>
+          </div>
+        ) : (
+          <>
+            <div className="mt-4 sm:mt-6">
+              <KpiCards metrics={metrics} />
+            </div>
 
-        <div className="mt-4 sm:mt-6">
-          <HourlyOrdersChart ordersByHour={metrics.ordersByHour} branches={metrics.branches} />
-        </div>
+            <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-2">
+              <DailySalesChart data={metrics.dailySales} />
+              <BranchSalesChart data={metrics.salesByBranch} />
+            </div>
+
+            <div className="mt-4 sm:mt-6">
+              <HourlyOrdersChart data={metrics.ordersByHour} />
+            </div>
+          </>
+        )}
       </div>
     </div>
   )
