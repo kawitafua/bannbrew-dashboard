@@ -1,4 +1,4 @@
-import { formatCurrency, formatNumber } from '../lib/format'
+import { formatCurrency, formatCurrencyDecimal, formatNumber } from '../lib/format'
 
 /**
  * การ์ด KPI หนึ่งใบ: label (สีน้ำตาลอมเทา) ด้านบน + value (ตัวหนา ตัวใหญ่ สีน้ำตาลเข้ม) ด้านล่าง
@@ -32,7 +32,7 @@ export default function KpiCards({ metrics }) {
     <div className="grid grid-cols-2 gap-3 sm:gap-4 lg:grid-cols-4">
       <KpiCard label="ยอดขายรวม" value={formatCurrency(metrics.totalSales)} />
       <KpiCard label="จำนวนบิล" value={`${formatNumber(metrics.orderCount)} บิล`} />
-      <KpiCard label="ยอดเฉลี่ยต่อบิล" value={formatCurrency(metrics.averageOrderValue)} />
+      <KpiCard label="ยอดเฉลี่ยต่อบิล" value={formatCurrencyDecimal(metrics.averageOrderValue)} />
       <KpiCard
         label="ลูกค้าสมาชิก (ไม่ซ้ำ)"
         value={`${formatNumber(metrics.memberCount)} คน`}

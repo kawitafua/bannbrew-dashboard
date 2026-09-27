@@ -8,6 +8,11 @@ const numberFormatter = new Intl.NumberFormat('th-TH', {
   maximumFractionDigits: 0,
 })
 
+const decimalCurrencyFormatter = new Intl.NumberFormat('th-TH', {
+  minimumFractionDigits: 2,
+  maximumFractionDigits: 2,
+})
+
 /** จำนวนเต็ม มีจุลภาคคั่นหลักพัน เช่น 12345 -> "12,345" */
 export function formatNumber(value) {
   return numberFormatter.format(Math.round(value))
@@ -16,6 +21,11 @@ export function formatNumber(value) {
 /** จำนวนเงิน มีจุลภาคคั่นหลักพัน + หน่วย "฿" เช่น 12345.6 -> "฿12,346" */
 export function formatCurrency(value) {
   return `฿${numberFormatter.format(Math.round(value))}`
+}
+
+/** จำนวนเงิน แบบมีทศนิยม 2 ตำแหน่งเสมอ + หน่วย "฿" เช่น 128.3901 -> "฿128.39" */
+export function formatCurrencyDecimal(value) {
+  return `฿${decimalCurrencyFormatter.format(value)}`
 }
 
 /** ย่อจำนวนเงินให้สั้นสำหรับแกนกราฟ เช่น 1500 -> "฿1.5K", 2000000 -> "฿2.0M" */
