@@ -23,8 +23,6 @@ dist-ssr
 *.sln
 *.sw?
 
-# ข้อมูลขายจริงของร้าน (มี customer_id ของสมาชิก) - ไม่ควรอยู่ใน public repo
-public/sales.csv
 
 # ไฟล์สำรอง/ไฟล์ซ้ำที่เกิดจากการ save ไฟล์ที่ Claude ส่งให้ทับไม่สำเร็จ
 Claude outputs/
