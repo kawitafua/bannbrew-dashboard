@@ -6,12 +6,21 @@ import {
   getBranchOptions,
   getDateBounds,
   filterRows,
+  getActiveCustomerIds,
 } from './lib/metrics'
+import {
+  normalizeCustomerRows,
+  filterCustomerRows,
+  computeCustomerMetrics,
+} from './lib/customerMetrics'
 import FilterBar from './components/FilterBar'
 import KpiCards from './components/KpiCards'
 import DailySalesChart from './components/DailySalesChart'
 import BranchSalesChart from './components/BranchSalesChart'
 import HourlyOrdersChart from './components/HourlyOrdersChart'
+import CustomerKpiCards from './components/CustomerKpiCards'
+import CategoryBarChart from './components/CategoryBarChart'
+import MemberSignupsChart from './components/MemberSignupsChart'
 
 const EMPTY_FILTERS = { branch: 'all', startDate: '', endDate: '' }
 
@@ -21,6 +30,12 @@ function App() {
   const [rawRowCount, setRawRowCount] = useState(0)
   const [error, setError] = useState(null)
   const [filters, setFilters] = useState(EMPTY_FILTERS)
+
+  // ข้อมูลสมาชิกจาก public/customers.csv — แยก state ต่างหากจากยอดขาย เพราะเป็นคนละไฟล์/
+  // คนละจังหวะโหลด ถ้าไฟล์นี้โหลดไม่สำเร็จก็ไม่ควรทำให้ส่วนยอดขายที่เหลือใช้งานไม่ได้ไปด้วย
+  const [customerRows, setCustomerRows] = useState(null)
+  const [rawCustomerRowCount, setRawCustomerRowCount] = useState(0)
+  const [customerError, setCustomerError] = useState(null)
 
   useEffect(() => {
     // ไฟล์อยู่ใน public/ จึง fetch ได้ตรง ๆ ที่ path "/sales.csv"
@@ -43,6 +58,26 @@ function App() {
         setError(err.message)
       },
     })
+
+    // เดียวกันกับด้านบนแต่สำหรับ customers.csv (ข้อมูลสมาชิก) — parse แยก effect เพราะเป็นคนละ
+    // ไฟล์คนละ config การแปลงข้อมูล
+    Papa.parse('/customers.csv', {
+      download: true,
+      header: true,
+      skipEmptyLines: 'greedy',
+      transformHeader: (header) => header.replace(/^﻿/, '').trim(),
+      transform: (value) => (typeof value === 'string' ? value.trim() : value),
+      complete: (result) => {
+        if (result.errors?.length) {
+          console.warn('PapaParse warnings (customers.csv):', result.errors)
+        }
+        setRawCustomerRowCount(result.data.length)
+        setCustomerRows(normalizeCustomerRows(result.data))
+      },
+      error: (err) => {
+        setCustomerError(err.message)
+      },
+    })
   }, [])
 
   // ตัวเลือกสาขา + ขอบเขตวันที่ ต้องมาจากข้อมูล "ทั้งชุด" เสมอ ไม่ใช่ข้อมูลที่กรองแล้ว
@@ -58,6 +93,24 @@ function App() {
     [allRows, filters],
   )
   const metrics = useMemo(() => computeMetrics(filteredRows), [filteredRows])
+
+  // เคยซื้อจริงหรือไม่ ต้องดูจากยอดขาย "ทั้งชุด" เสมอ (allRows) ไม่ใช่ filteredRows
+  // เพราะสถานะนี้ควรนับตลอดประวัติ ไม่ผูกกับตัวกรองช่วงวันที่ที่กำลังดูอยู่ตอนนี้
+  const activeCustomerIds = useMemo(
+    () => (allRows ? getActiveCustomerIds(allRows) : new Set()),
+    [allRows],
+  )
+  // ส่วนสมาชิกกรองแค่ตาม "สาขา" ตัวเดียวกับฝั่งยอดขาย ไม่กรองตามช่วงวันที่ เพราะวันที่สมัคร
+  // สมาชิกเป็นคนละมิติกับวันที่ซื้อของ — กรองตามวันที่จะทำให้ตัวเลขสมาชิกดูสับสน (เช่น สมาชิก
+  // ที่สมัครเมื่อปีก่อนจะหายไปจากรายงานทั้งที่ยังเป็นสมาชิกอยู่)
+  const filteredCustomerRows = useMemo(
+    () => (customerRows ? filterCustomerRows(customerRows, filters) : []),
+    [customerRows, filters],
+  )
+  const customerMetrics = useMemo(
+    () => computeCustomerMetrics(filteredCustomerRows, activeCustomerIds),
+    [filteredCustomerRows, activeCustomerIds],
+  )
 
   const hasActiveFilters =
     filters.branch !== 'all' || filters.startDate !== '' || filters.endDate !== ''
@@ -152,6 +205,60 @@ function App() {
             </div>
           </>
         )}
+
+        {/* ส่วนข้อมูลสมาชิกจาก customers.csv — วางแยกจากส่วนยอดขายด้านบนโดยตั้งใจ ไม่ผูกกับ
+            filteredRows.length === 0 ของฝั่งยอดขาย เพราะสองส่วนนี้คนละไฟล์คนละตัวกรอง (สมาชิก
+            กรองแค่ตามสาขา ไม่กรองตามวันที่) การไม่มีข้อมูลยอดขายในช่วงที่เลือกไม่ควรทำให้ส่วน
+            สมาชิกหายไปด้วย */}
+        <div className="mt-8 sm:mt-10">
+          <h2 className="text-lg font-bold text-[#3b2a1a] sm:text-xl">ข้อมูลสมาชิก</h2>
+          <p className="mt-1 text-sm text-[#8a7256]">สรุปข้อมูลสมาชิกจาก customers.csv</p>
+
+          {customerError ? (
+            <div className="mt-4 rounded-xl border border-[#d8bd84] bg-[#f4e8cf] p-6 sm:mt-6">
+              <p className="text-sm font-medium text-[#4a3a1a]">
+                โหลด customers.csv ไม่สำเร็จ: {customerError}
+              </p>
+            </div>
+          ) : !customerRows ? (
+            <div className="mt-4 rounded-xl border border-[#e3d5bf] bg-[#fdfbf6] p-6 sm:mt-6">
+              <p className="text-sm text-[#8a7256]">กำลังโหลดข้อมูลสมาชิก...</p>
+            </div>
+          ) : customerRows.length === 0 ? (
+            <div className="mt-4 rounded-xl border border-[#d8bd84] bg-[#f4e8cf] p-6 sm:mt-6">
+              <p className="text-sm font-medium text-[#4a3a1a]">
+                ไม่พบข้อมูลที่อ่านได้จาก customers.csv (อ่านไฟล์เจอ {rawCustomerRowCount} แถว
+                แต่ไม่มีแถวไหนมีค่า <code className="rounded bg-[#e9d9b0] px-1">customer_id</code>{' '}
+                เลย)
+              </p>
+            </div>
+          ) : filteredCustomerRows.length === 0 ? (
+            <div className="mt-4 rounded-xl border border-[#d8bd84] bg-[#f4e8cf] p-6 sm:mt-6">
+              <p className="text-sm font-medium text-[#4a3a1a]">
+                ไม่มีข้อมูลสมาชิกตรงกับสาขาที่เลือกไว้
+              </p>
+            </div>
+          ) : (
+            <>
+              <div className="mt-4 sm:mt-6">
+                <CustomerKpiCards metrics={customerMetrics} />
+              </div>
+
+              <div className="mt-4 grid grid-cols-1 gap-4 sm:mt-6 sm:gap-6 lg:grid-cols-2">
+                <CategoryBarChart title="สมาชิกแยกตามเพศ" data={customerMetrics.genderBreakdown} />
+                <CategoryBarChart
+                  title="สมาชิกแยกตามช่วงอายุ"
+                  data={customerMetrics.ageGroupBreakdown}
+                />
+                <CategoryBarChart
+                  title="สมาชิกแยกตามสาขา"
+                  data={customerMetrics.homeBranchBreakdown}
+                />
+                <MemberSignupsChart data={customerMetrics.signupsByMonth} />
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   )

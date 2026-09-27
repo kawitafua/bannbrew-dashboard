@@ -124,6 +124,16 @@ export function getUniqueMemberCount(rows) {
 }
 
 /**
+ * Set ของ customer_id ที่เคยซื้อจริงอย่างน้อย 1 ครั้ง (มีแถวใน sales.csv อย่างน้อยหนึ่งแถว)
+ * ใช้เทียบกับรายชื่อสมาชิกทั้งหมดใน customers.csv (ดู customerMetrics.js) เพื่อหา
+ * "อัตราสมาชิกที่เคยซื้อ" — ตั้งใจรับ rows แบบ "ทั้งชุดไม่กรอง" เสมอ (allRows ไม่ใช่ filteredRows)
+ * เพราะสถานะเคยซื้อหรือไม่ควรนับตลอดประวัติ ไม่ควรผูกกับตัวกรองช่วงวันที่ที่ผู้ใช้เลือกดูอยู่
+ */
+export function getActiveCustomerIds(rows) {
+  return new Set(rows.filter((row) => row.isMember).map((row) => row.customerId))
+}
+
+/**
  * ยอดขายรายวัน: รวม lineTotal ของทุกแถวที่อยู่วันเดียวกัน (dateKey เดียวกัน)
  * คืนค่าเป็น array [{ date, total }] เรียงจากวันเก่าสุด -> ใหม่สุด
  * (เหมาะสำหรับกราฟเส้นแนวโน้มตามเวลา)
