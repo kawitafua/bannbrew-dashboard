@@ -1,0 +1,32 @@
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+node_modules
+dist
+dist-ssr
+*.local
+
+# Editor directories and files
+.vscode/*
+!.vscode/extensions.json
+.idea
+.DS_Store
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# ข้อมูลขายจริงของร้าน (มี customer_id ของสมาชิก) - ไม่ควรอยู่ใน public repo
+public/sales.csv
+
+# ไฟล์สำรอง/ไฟล์ซ้ำที่เกิดจากการ save ไฟล์ที่ Claude ส่งให้ทับไม่สำเร็จ
+Claude outputs/
+src/**/*-1.jsx
+src/**/*-1.js
