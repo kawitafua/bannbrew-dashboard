@@ -1,9 +1,10 @@
 import ThaiDateField from './ThaiDateField'
+import HourRangeField from './HourRangeField'
 
 /**
- * แถบตัวกรองส่วนกลางของแดชบอร์ด: เลือกสาขา + เลือกช่วงวันที่ + ปุ่มล้างตัวกรอง
- * ตัวกรองนี้มีผลกับ "ทุกการ์ด/กราฟ" ในหน้า (KPI, ยอดขายรายวัน, ยอดขายแยกสาขา,
- * จำนวนบิลตามชั่วโมง) เพราะ App.jsx กรองแถวข้อมูลก่อนคำนวณ metrics ทั้งหมด
+ * แถบตัวกรองส่วนกลางของแดชบอร์ด: เลือกสาขา + เลือกช่วงวันที่ + เลือกช่วงเวลา (ชั่วโมง) + ปุ่ม
+ * ล้างตัวกรอง ตัวกรองนี้มีผลกับ "ทุกการ์ด/กราฟ" ในหน้า (KPI, ยอดขายรายวัน, ยอดขายแยกสาขา,
+ * จำนวนบิลตามชั่วโมง, ข้อมูลสมาชิก) เพราะ App.jsx กรองแถวข้อมูลก่อนคำนวณ metrics ทั้งหมด
  *
  * branches: รายชื่อสาขาทั้งหมด (เรียงยอดขายมาก -> น้อย) มาจากข้อมูลทั้งชุด ไม่ใช่ข้อมูล
  * ที่กรองแล้ว เพื่อไม่ให้ตัวเลือกใน dropdown หายไปเรื่อย ๆ เวลาผู้ใช้กรองอยู่
@@ -11,6 +12,9 @@ import ThaiDateField from './ThaiDateField'
  * minDate/maxDate: ขอบเขตวันที่จริงในไฟล์ ใช้จำกัดปีใน date picker ไม่ให้เลือกปีที่ไม่มีข้อมูล
  * ช่องวันที่ใช้ ThaiDateField (วัน/เดือน/ปี พ.ศ. แบบ dropdown) แทน <input type="date"> ของ
  * เบราว์เซอร์ เพราะ input แบบ native บังคับแสดงเป็น ค.ศ. เสมอ ปรับเป็น พ.ศ. เองไม่ได้
+ *
+ * startHour/endHour: ช่วงเวลา (ชั่วโมง 0-23) ใช้ HourRangeField — ตรรกะ clamp กันเลือก
+ * ชั่วโมงเริ่มต้น > สิ้นสุด อยู่ใน App.jsx (onStartHourChange/onEndHourChange)
  */
 export default function FilterBar({
   branches,
@@ -22,6 +26,10 @@ export default function FilterBar({
   onEndDateChange,
   minDate,
   maxDate,
+  startHour,
+  endHour,
+  onStartHourChange,
+  onEndHourChange,
   onClear,
   hasActiveFilters,
 }) {
@@ -58,6 +66,13 @@ export default function FilterBar({
           onChange={onEndDateChange}
           minDate={minDate}
           maxDate={maxDate}
+        />
+
+        <HourRangeField
+          startHour={startHour}
+          endHour={endHour}
+          onStartHourChange={onStartHourChange}
+          onEndHourChange={onEndHourChange}
         />
 
         <button

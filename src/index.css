@@ -1,1 +1,10 @@
 @import "tailwindcss";
+
+/* ใช้ IBM Plex Sans Thai ทั้งแดชบอร์ด (ดูเหตุผลเรื่องการเลือกฟอนต์ใน main.jsx) แทนฟอนต์
+   เริ่มต้นของเบราว์เซอร์ ให้ดูทันสมัยและอ่านง่ายขึ้น โดยเฉพาะตัวเลขในการ์ด KPI/กราฟ
+   antialiased ช่วยให้เส้นตัวอักษรคมชัดขึ้นบนจอทั่วไป (ลดความหนา/มัวของฟอนต์ที่มีน้ำหนักมาก) */
+body {
+  font-family: 'IBM Plex Sans Thai', system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}

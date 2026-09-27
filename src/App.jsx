@@ -22,7 +22,7 @@ import CustomerKpiCards from './components/CustomerKpiCards'
 import CategoryBarChart from './components/CategoryBarChart'
 import MemberSignupsChart from './components/MemberSignupsChart'
 
-const EMPTY_FILTERS = { branch: 'all', startDate: '', endDate: '' }
+const EMPTY_FILTERS = { branch: 'all', startDate: '', endDate: '', startHour: '', endHour: '' }
 
 function App() {
   // allRows = ข้อมูลทั้งชุดหลัง normalize (ยังไม่กรอง) — คำนวณครั้งเดียวตอนโหลดไฟล์เสร็จ
@@ -92,7 +92,7 @@ function App() {
     () => (allRows ? filterRows(allRows, filters) : []),
     [allRows, filters],
   )
-  const metrics = useMemo(() => computeMetrics(filteredRows), [filteredRows])
+  const metrics = useMemo(() => computeMetrics(filteredRows, filters), [filteredRows, filters])
 
   // เคยซื้อจริงหรือไม่ ต้องดูจากยอดขาย "ทั้งชุด" เสมอ (allRows) ไม่ใช่ filteredRows
   // เพราะสถานะนี้ควรนับตลอดประวัติ ไม่ผูกกับตัวกรองช่วงวันที่ที่กำลังดูอยู่ตอนนี้
@@ -113,9 +113,38 @@ function App() {
   )
 
   const hasActiveFilters =
-    filters.branch !== 'all' || filters.startDate !== '' || filters.endDate !== ''
+    filters.branch !== 'all' ||
+    filters.startDate !== '' ||
+    filters.endDate !== '' ||
+    filters.startHour !== '' ||
+    filters.endHour !== ''
 
   const handleClearFilters = () => setFilters(EMPTY_FILTERS)
+
+  // เลือกชั่วโมงเริ่มต้น: ถ้าชั่วโมงสิ้นสุดที่เลือกไว้ก่อนหน้านี้น้อยกว่าค่าใหม่ ให้เลื่อนตามขึ้นไป
+  // ด้วย กันกรณีเลือกช่วงกลับด้าน (เช่นเคยตั้งสิ้นสุด = 10 แล้วมาเปลี่ยนเริ่มต้น = 15 ทีหลัง)
+  const handleStartHourChange = (startHour) => {
+    setFilters((prev) => ({
+      ...prev,
+      startHour,
+      endHour:
+        startHour !== '' && prev.endHour !== '' && Number(prev.endHour) < Number(startHour)
+          ? startHour
+          : prev.endHour,
+    }))
+  }
+
+  // เดียวกันกับด้านบนแต่กลับด้าน: เลือกชั่วโมงสิ้นสุดน้อยกว่าเริ่มต้นที่ตั้งไว้ก่อนหน้า
+  const handleEndHourChange = (endHour) => {
+    setFilters((prev) => ({
+      ...prev,
+      endHour,
+      startHour:
+        endHour !== '' && prev.startHour !== '' && Number(prev.startHour) > Number(endHour)
+          ? endHour
+          : prev.startHour,
+    }))
+  }
 
   if (error) {
     return (
@@ -158,8 +187,10 @@ function App() {
   return (
     <div className="min-h-screen bg-[#f5f0e6]">
       <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
-        <h1 className="text-xl font-bold text-[#3b2a1a] sm:text-2xl">บ้านบรู Dashboard</h1>
-        <p className="mt-1 text-sm text-[#8a7256]">สรุปยอดขายจาก sales.csv</p>
+        <h1 className="text-xl font-bold tracking-tight text-[#3b2a1a] sm:text-2xl">
+          บ้านบรู Dashboard
+        </h1>
+        <p className="mt-1 text-sm font-medium text-[#8a7256]">สรุปยอดขายจาก sales.csv</p>
 
         <div className="mt-4 sm:mt-6">
           <FilterBar
@@ -172,6 +203,10 @@ function App() {
             onEndDateChange={(endDate) => setFilters((prev) => ({ ...prev, endDate }))}
             minDate={dateBounds.minDate}
             maxDate={dateBounds.maxDate}
+            startHour={filters.startHour}
+            endHour={filters.endHour}
+            onStartHourChange={handleStartHourChange}
+            onEndHourChange={handleEndHourChange}
             onClear={handleClearFilters}
             hasActiveFilters={hasActiveFilters}
           />
@@ -180,7 +215,7 @@ function App() {
         {filteredRows.length === 0 ? (
           <div className="mt-4 rounded-xl border border-[#d8bd84] bg-[#f4e8cf] p-6 sm:mt-6">
             <p className="text-sm font-medium text-[#4a3a1a]">
-              ไม่มีข้อมูลตรงกับตัวกรองที่เลือกไว้ (สาขา/ช่วงวันที่) ลองปรับตัวกรอง หรือกด
+              ไม่มีข้อมูลตรงกับตัวกรองที่เลือกไว้ (สาขา/ช่วงวันที่/ช่วงเวลา) ลองปรับตัวกรอง หรือกด
               "ล้างตัวกรอง" ด้านบน
             </p>
           </div>
@@ -211,8 +246,10 @@ function App() {
             กรองแค่ตามสาขา ไม่กรองตามวันที่) การไม่มีข้อมูลยอดขายในช่วงที่เลือกไม่ควรทำให้ส่วน
             สมาชิกหายไปด้วย */}
         <div className="mt-8 sm:mt-10">
-          <h2 className="text-lg font-bold text-[#3b2a1a] sm:text-xl">ข้อมูลสมาชิก</h2>
-          <p className="mt-1 text-sm text-[#8a7256]">สรุปข้อมูลสมาชิกจาก customers.csv</p>
+          <h2 className="text-lg font-bold tracking-tight text-[#3b2a1a] sm:text-xl">
+            ข้อมูลสมาชิก
+          </h2>
+          <p className="mt-1 text-sm font-medium text-[#8a7256]">สรุปข้อมูลสมาชิกจาก customers.csv</p>
 
           {customerError ? (
             <div className="mt-4 rounded-xl border border-[#d8bd84] bg-[#f4e8cf] p-6 sm:mt-6">

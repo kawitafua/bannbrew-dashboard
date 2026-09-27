@@ -201,12 +201,16 @@ export function getSalesByBranch(rows) {
 }
 
 /**
- * จำนวนบิลแยกตามชั่วโมงของวัน (0-23): นับ order_id ที่ไม่ซ้ำกันในแต่ละชั่วโมง
+ * จำนวนบิลแยกตามชั่วโมงของวัน: นับ order_id ที่ไม่ซ้ำกันในแต่ละชั่วโมง
  * (บิลเดียวกันมีหลายแถวแต่เป็นชั่วโมงเดียวกันเสมอ จึงนับด้วย Set เหมือน getOrderCount)
- * คืนค่าเป็น array ยาว 24 ช่อง [{ hour: 0, count }, ..., { hour: 23, count }]
- * มีครบทุกชั่วโมงเสมอแม้ชั่วโมงนั้นไม่มีบิลเลย (count = 0) เพื่อให้กราฟแกน X ไม่ขาดช่วง
+ * คืนค่าเป็น array [{ hour, count }, ...] ตั้งแต่ minHour ถึง maxHour (ค่าเริ่มต้น 0-23 = ทั้งวัน)
+ * มีครบทุกชั่วโมงในช่วงนั้นเสมอแม้ชั่วโมงนั้นไม่มีบิลเลย (count = 0) เพื่อให้กราฟแกน X ไม่ขาดช่วง
+ *
+ * minHour/maxHour ใช้ตัดขอบเขตที่ "แสดงผล" ให้ตรงกับตัวกรองช่วงเวลาที่ผู้ใช้เลือกใน FilterBar
+ * (rows ที่ส่งเข้ามาถูกกรองด้วย filterRows() ตามชั่วโมงเดียวกันนี้มาก่อนแล้ว การตัดขอบเขตตรงนี้
+ * ด้วยจึงไม่กระทบตัวเลข แค่ไม่ต้องวาดแท่ง 0 ของชั่วโมงที่ถูกกรองออกไปให้ดูรกเกินจำเป็น)
  */
-export function getOrderCountByHour(rows) {
+export function getOrderCountByHour(rows, minHour = 0, maxHour = 23) {
   const orderIdsByHour = Array.from({ length: 24 }, () => new Set())
 
   for (const row of rows) {
@@ -214,7 +218,9 @@ export function getOrderCountByHour(rows) {
     orderIdsByHour[row.hour].add(row.orderId)
   }
 
-  return orderIdsByHour.map((orderIds, hour) => ({ hour, count: orderIds.size }))
+  return orderIdsByHour
+    .map((orderIds, hour) => ({ hour, count: orderIds.size }))
+    .filter((entry) => entry.hour >= minHour && entry.hour <= maxHour)
 }
 
 /**
@@ -246,16 +252,25 @@ export function getDateBounds(rows) {
 }
 
 /**
- * กรองแถวข้อมูลตามตัวกรองที่ผู้ใช้เลือก: สาขา และ/หรือ ช่วงวันที่ (ทั้งคู่เลือกได้อิสระ)
+ * กรองแถวข้อมูลตามตัวกรองที่ผู้ใช้เลือก: สาขา, ช่วงวันที่ และ/หรือ ช่วงเวลา (ชั่วโมงของวัน)
+ * ทั้งสามกลุ่มเลือกได้อิสระจากกัน
  *  - branch: 'all' หรือค่าว่าง = ไม่กรองสาขา, ไม่งั้นต้องตรงกับ row.branch เป๊ะ
  *  - startDate / endDate: ค่าว่าง = ไม่จำกัดด้านนั้น, ไม่งั้นเทียบแบบ YYYY-MM-DD (เทียบ string
  *    ตรง ๆ ได้เลยเพราะ dateKey อยู่ในรูปแบบนี้อยู่แล้ว เรียงตามเวลาจริงพอดี)
+ *  - startHour / endHour: ค่าว่าง = ไม่จำกัดด้านนั้น, ไม่งั้นเทียบกับ row.hour (0-23) ตรง ๆ
+ *    แถวที่ไม่มีชั่วโมง (row.hour === null, กรณี datetime เสีย) จะถูกตัดทิ้งไปเลยถ้ามีการกรอง
+ *    ช่วงเวลาอยู่ เพราะไม่รู้ว่าแถวนั้นควรอยู่ในช่วงที่เลือกหรือไม่
  */
-export function filterRows(rows, { branch, startDate, endDate } = {}) {
+export function filterRows(rows, { branch, startDate, endDate, startHour, endHour } = {}) {
+  const minHour = startHour === '' || startHour === undefined || startHour === null ? null : Number(startHour)
+  const maxHour = endHour === '' || endHour === undefined || endHour === null ? null : Number(endHour)
+
   return rows.filter((row) => {
     if (branch && branch !== 'all' && row.branch !== branch) return false
     if (startDate && row.dateKey < startDate) return false
     if (endDate && row.dateKey > endDate) return false
+    if (minHour !== null && (row.hour === null || row.hour < minHour)) return false
+    if (maxHour !== null && (row.hour === null || row.hour > maxHour)) return false
     return true
   })
 }
@@ -264,8 +279,15 @@ export function filterRows(rows, { branch, startDate, endDate } = {}) {
  * คำนวณตัวเลขทุกอย่างที่แดชบอร์ดต้องใช้ จากแถวข้อมูลที่ผ่าน normalizeRows() แล้ว
  * (และอาจถูกกรองด้วย filterRows() มาก่อนแล้วก็ได้ — ฟังก์ชันนี้ไม่สนใจว่ากรองมาหรือยัง
  * แค่คำนวณจากแถวที่ได้รับเข้ามาตรง ๆ) เรียกใหม่ทุกครั้งที่ตัวกรองเปลี่ยน
+ *
+ * hourBounds (startHour/endHour จากตัวกรองช่วงเวลา): ใช้แค่กำหนดว่ากราฟ "จำนวนบิลตามชั่วโมง"
+ * ควรวาดตั้งแต่ชั่วโมงไหนถึงชั่วโมงไหน (ให้ตรงกับช่วงที่ผู้ใช้เลือกดู) ตัวเลข count เองมาจาก
+ * rows ที่กรองมาก่อนหน้านี้แล้วอยู่แล้ว ไม่ได้กรองซ้ำตรงนี้
  */
-export function computeMetrics(rows) {
+export function computeMetrics(rows, { startHour, endHour } = {}) {
+  const minHour = startHour === '' || startHour === undefined || startHour === null ? 0 : Number(startHour)
+  const maxHour = endHour === '' || endHour === undefined || endHour === null ? 23 : Number(endHour)
+
   return {
     rowCount: rows.length,
     totalSales: getTotalSales(rows),
@@ -274,7 +296,7 @@ export function computeMetrics(rows) {
     memberCount: getUniqueMemberCount(rows),
     dailySales: getDailySalesWithMovingAverage(rows, 7),
     salesByBranch: getSalesByBranch(rows),
-    ordersByHour: getOrderCountByHour(rows),
+    ordersByHour: getOrderCountByHour(rows, minHour, maxHour),
   }
 }
 

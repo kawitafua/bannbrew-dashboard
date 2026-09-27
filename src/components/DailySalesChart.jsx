@@ -56,7 +56,7 @@ function renderLegend({ payload }) {
 export default function DailySalesChart({ data }) {
   return (
     <div className="rounded-xl border border-[#e3d5bf] bg-[#fdfbf6] p-4 shadow-sm sm:p-5">
-      <h2 className="text-sm font-semibold text-[#3b2a1a]">ยอดขายรายวัน</h2>
+      <h2 className="text-sm font-semibold tracking-tight text-[#3b2a1a]">ยอดขายรายวัน</h2>
       {/* กราฟนี้ขึ้นเต็มความกว้างหน้าจอ (ดู App.jsx) เลยเพิ่มความสูงจาก h-64/h-80 เดิม
           ให้สัดส่วนพอดีกับความกว้างที่มากขึ้น อ่านแนวโน้มและจุดพีคได้ง่ายขึ้น */}
       <div className="mt-2 h-72 w-full sm:h-96">

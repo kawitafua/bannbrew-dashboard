@@ -12,8 +12,8 @@ import { formatCurrency, formatCurrencyDecimal, formatNumber } from '../lib/form
 function KpiCard({ label, value }) {
   return (
     <div className="rounded-xl border border-[#e3d5bf] bg-[#fdfbf6] p-3 shadow-sm sm:p-5">
-      <p className="text-xs text-[#8a7256] sm:text-sm">{label}</p>
-      <p className="mt-1.5 text-xl font-semibold text-[#3b2a1a] sm:mt-2 sm:text-2xl lg:text-3xl">
+      <p className="text-xs font-medium tracking-wide text-[#8a7256] sm:text-sm">{label}</p>
+      <p className="mt-1.5 text-xl font-bold tracking-tight text-[#3b2a1a] sm:mt-2 sm:text-2xl lg:text-3xl">
         {value}
       </p>
     </div>

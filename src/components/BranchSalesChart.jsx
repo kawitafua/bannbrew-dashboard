@@ -51,7 +51,7 @@ function BranchTick({ x, y, payload }) {
 export default function BranchSalesChart({ data }) {
   return (
     <div className="rounded-xl border border-[#e3d5bf] bg-[#fdfbf6] p-4 shadow-sm sm:p-5">
-      <h2 className="text-sm font-semibold text-[#3b2a1a]">ยอดขายแยกสาขา</h2>
+      <h2 className="text-sm font-semibold tracking-tight text-[#3b2a1a]">ยอดขายแยกสาขา</h2>
       <div className="mt-4 h-64 w-full sm:h-80">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 24, right: 16, left: 0, bottom: 0 }}>

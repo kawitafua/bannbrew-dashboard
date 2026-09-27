@@ -6,11 +6,26 @@ import ChartTooltip from './ChartTooltip'
 // ไม่ต้องไล่สีตามชั่วโมงเพราะเป็นตัวชี้วัดเดียว (จำนวนบิล) แค่แยกตามช่วงเวลา
 const BAR_COLOR = '#A9642F'
 
-// แท่งข้อมูลมีครบ 24 ชั่วโมงเสมอ แต่ถ้าบังคับให้แสดงป้ายกำกับครบทั้ง 24 ป้าย (interval={0})
-// บนจอมือถือแคบ ๆ ป้ายจะชนกันจนอ่านไม่ออก (เช่น "0001020304...") จึงกำหนดตายตัวว่า
-// แสดงป้ายทุก 3 ชั่วโมงเท่านั้น ("00", "03", "06", ...) ซึ่งมีระยะห่างพออ่านออกได้ทั้งจอเล็ก/จอใหญ่
-// (แท่งของทุกชั่วโมงยังคงถูกวาดครบ 24 แท่ง แค่ไม่ใช่ทุกแท่งที่มีป้ายกำกับ)
-const HOUR_TICKS = [0, 3, 6, 9, 12, 15, 18, 21]
+/**
+ * คำนวณชั่วโมงที่จะแสดงป้ายกำกับบนแกน X แบบไดนามิก ไม่ใช้เลขชั่วโมงตายตัวเหมือนเดิมอีกต่อไป
+ * เพราะตอนนี้ data อาจถูกตัดขอบเขตมาจากตัวกรอง "ช่วงเวลา" ใน FilterBar (เช่นเลือกดูแค่ 09:00-17:00)
+ * ไม่ใช่ 0-23 เต็มวันเสมอไปแล้ว — ถ้ายังใช้ป้ายตายตัว [0, 3, 6, ...] ตอนกรองแคบลง ป้ายที่ตั้งไว้
+ * อาจไม่ตรงกับชั่วโมงที่เหลืออยู่ใน data เลยสักอัน ทำให้แกน X ไม่มีป้ายขึ้นเลย
+ * เลือกระยะห่างระหว่างป้ายให้ไม่เกิน ~8 ป้ายเสมอ (กันป้ายชนกันบนจอแคบ) ไม่ว่าช่วงที่เลือกจะกว้าง
+ * แค่ไหน และใส่ชั่วโมงสุดท้ายของช่วงเสมอ กันแกนตัดจบไปดื้อ ๆ โดยไม่มีป้ายท้ายสุด
+ */
+function computeHourTicks(data) {
+  if (!data.length) return []
+  const minHour = data[0].hour
+  const maxHour = data[data.length - 1].hour
+  const span = maxHour - minHour
+  const step = span <= 8 ? 1 : span <= 16 ? 2 : 3
+
+  const ticks = []
+  for (let h = minHour; h < maxHour; h += step) ticks.push(h)
+  ticks.push(maxHour)
+  return ticks
+}
 
 /** แปลงเลขชั่วโมง (0-23) เป็นป้ายแกน X แบบสั้น เช่น 8 -> "08" */
 function formatHourTick(hour) {
@@ -24,14 +39,17 @@ function formatHourLabel(hour) {
 
 /**
  * กราฟแท่งจำนวนบิลแยกตามชั่วโมงของวัน (0-23)
- * รับ data = metrics.ordersByHour จาก computeMetrics() รูปแบบ [{hour, count}, ...24]
- * ข้อมูลนี้คำนวณจากแถวที่ผ่านตัวกรองสาขา/ช่วงวันที่ส่วนกลาง (FilterBar) มาแล้ว
+ * รับ data = metrics.ordersByHour จาก computeMetrics() รูปแบบ [{hour, count}, ...]
+ * ข้อมูลนี้คำนวณจากแถวที่ผ่านตัวกรองสาขา/ช่วงวันที่/ช่วงเวลาส่วนกลาง (FilterBar) มาแล้ว
  * จึงไม่ต้องมี dropdown เลือกสาขาซ้ำในการ์ดนี้อีก — ใช้ตัวกรองที่ด้านบนของแดชบอร์ดแทน
+ * (data อาจไม่ครบ 24 ชั่วโมงเสมอไปแล้ว ถ้าผู้ใช้เลือกช่วงเวลาแคบลงในตัวกรอง)
  */
 export default function HourlyOrdersChart({ data }) {
+  const hourTicks = computeHourTicks(data)
+
   return (
     <div className="rounded-xl border border-[#e3d5bf] bg-[#fdfbf6] p-4 shadow-sm sm:p-5">
-      <h2 className="text-sm font-semibold text-[#3b2a1a]">จำนวนบิลตามชั่วโมงของวัน</h2>
+      <h2 className="text-sm font-semibold tracking-tight text-[#3b2a1a]">จำนวนบิลตามชั่วโมงของวัน</h2>
       <div className="mt-2 h-64 w-full sm:h-80">
         <ResponsiveContainer width="100%" height="100%">
           <BarChart data={data} margin={{ top: 8, right: 16, left: 0, bottom: 0 }}>
@@ -39,7 +57,7 @@ export default function HourlyOrdersChart({ data }) {
             <XAxis
               dataKey="hour"
               tickFormatter={formatHourTick}
-              ticks={HOUR_TICKS}
+              ticks={hourTicks}
               tick={{ fill: '#9c8768', fontSize: 11 }}
               axisLine={{ stroke: '#cbb48f' }}
               tickLine={false}
